@@ -28,7 +28,7 @@ void DeviceControl::parseCmd(quint8 cmd,const QByteArray &data)
             emit idleMode(data);
             break;
         }
-        case UPDATE_FINGER_CNT:
+        case UPDATA_FINGER_TABLE:
         {
             emit updateFingerTable(data);
             break;
@@ -259,12 +259,19 @@ void DeviceControl::toggleWorkMode()
 {
     QByteArray data =  protocol->Builder(TOGGLE_MODE,"");
     tcpClient->send(data);
+    emit setDisableToggleButton();
 }
 
 void DeviceControl::onConnectedReceived(QList<QByteArray> &data)
 {
     for(QByteArray i:data)
     {
+        if(i.isEmpty())
+        {
+            qWarning()<<"收到空数据包";
+            continue;
+        }
+
         //先解析命令
         quint8 cmd = static_cast<quint8>(i[0]);
         i.remove(0,1);

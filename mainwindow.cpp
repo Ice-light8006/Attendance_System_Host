@@ -59,10 +59,11 @@ MainWindow::MainWindow(QWidget *parent)
     QObject::connect(deviceControl,&DeviceControl::enrollMode,controlPanel,&ControlPanel::labelToEnroll);
     QObject::connect(deviceControl,&DeviceControl::idleMode,controlPanel,&ControlPanel::labelToIdle);
     QObject::connect(controlPanel,&ControlPanel::toggleModeRequested,deviceControl,&DeviceControl::toggleWorkMode);
-    QObject::connect(deviceControl,&DeviceControl::updateFingerTable,controlPanel,&ControlPanel::updateFingerCnt);
-    QObject::connect(deviceControl,&DeviceControl::updateFingerTable,databaseManager,&DatabaseManager::verifyFingerInfo);
+    QObject::connect(deviceControl,&DeviceControl::updateFingerTable,controlPanel,&ControlPanel::updateFingerCntLabel);
+    QObject::connect(deviceControl,&DeviceControl::updateFingerTable,databaseManager,&DatabaseManager::updateFingerTable);
     QObject::connect(databaseManager,&DatabaseManager::updateTableView,databasePanel,&DatabasePanel::updateTableView);
     QObject::connect(databasePanel,&DatabasePanel::deleteInfoByIndex,this,&MainWindow::deleteSelectedFinger);
+    QObject::connect(deviceControl,&DeviceControl::setDisableToggleButton,controlPanel,&ControlPanel::setToggleButtonDisable);
 
     setupEnrollLogConnections();
     setupVerifyLogConnections();

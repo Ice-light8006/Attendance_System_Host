@@ -10,7 +10,7 @@
 
 #define IDLE_MODE 0xA1
 #define ENROLL_MODE 0xA2
-#define UPDATE_FINGER_CNT 0xA3
+#define UPDATA_FINGER_TABLE 0xA3
 
 #define TOGGLE_MODE 0xB1    //通知下位机
 #define DELETE_FINGER 0xB2
@@ -122,6 +122,8 @@ signals:
 
     //更新UI界面上的指纹数量信号
     void updateFingerTable(const QByteArray &data);
+
+    void setDisableToggleButton();
 };
 
 #endif // DEVICECONTROL_H

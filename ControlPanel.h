@@ -17,7 +17,9 @@ public:
 public slots:
     void labelToEnroll();
     void labelToIdle();
-    void updateFingerCnt(const QByteArray &data);
+    void updateFingerCntLabel(const QByteArray &data);
+    void setToggleButtonDisable();
+    void setToggleButtonEnable();
 private:
     QVBoxLayout* layout;
     QPushButton* toggleModeButton;

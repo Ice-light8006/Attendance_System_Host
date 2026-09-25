@@ -5,6 +5,37 @@ DatabaseManager::DatabaseManager(QObject *parent)
 
 }
 
+static QVector<bool> makeFingerTable(const QByteArray &data)
+{
+    QVector<bool> tmp;
+    tmp.resize(1024);
+    for(int i = 0;i<128;i++)
+    {
+        for(int j = 0;j<8;j++)
+        {
+            tmp[i*8+j] = (data[i]>>j) & 1;
+        }
+    }
+    return tmp;
+}
+
+static QVector<bool> makeFingerTable(const QByteArray &data,quint16* cnt)
+{
+    int count = 0;
+    QVector<bool> tmp;
+    tmp.resize(1024);
+    for(int i = 0;i<128;i++)
+    {
+        for(int j = 0;j<8;j++)
+        {
+            tmp[i*8+j] = (data[i]>>j) & 1;
+            count += (data[i]>>j) & 1;
+        }
+    }
+    *cnt = count;
+    return tmp;
+}
+
 bool DatabaseManager::initDatabase()
 {
     db = QSqlDatabase::addDatabase("QSQLITE");
@@ -118,9 +149,9 @@ bool DatabaseManager::isInfoExistsByFinger(quint16 finger_id)
 {
     QSqlQuery query;
     query.prepare("SELECT EXISTS("
-                                 "SELECT 1 "
-                                 "FROM information "
-                                 "WHERE finger_id = :finger_id);");
+                  "SELECT 1 "
+                  "FROM information "
+                  "WHERE finger_id = :finger_id);");
     query.bindValue(":finger_id",finger_id);
     bool success = query.exec();
     if(!success)
@@ -142,12 +173,12 @@ bool DatabaseManager::isInfoExistsByFinger(quint16 finger_id)
 
 }
 
-void DatabaseManager::verifyFingerInfo(const QByteArray &data)
+void DatabaseManager::updateFingerTable(const QByteArray &data)
 {
-    quint16 cnt = (data[0]<<8) + data[1];
-    for(quint16 i = 1;i<=cnt;i++)
+    QVector<bool> fingerTable = makeFingerTable(data);
+    for(quint16 i = 0;i<1024;i++)
     {
-        if(!isInfoExistsByFinger(i))
+        if(fingerTable[i] && !isInfoExistsByFinger(i))
         {
             addInformation(i);
         }

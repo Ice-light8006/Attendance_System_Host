@@ -38,6 +38,7 @@ void TcpClient::onConnectionReceived(const QByteArray &data)
     if(data.isEmpty())
     {
         qWarning() << "TcpClient received empry!";
+        return;
     }
     QList<QByteArray> tmp = protocol->Parser(data);
 

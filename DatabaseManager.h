@@ -8,6 +8,7 @@
 #include <QDebug>
 #include <QString>
 #include <QVariantMap>
+#include <QVector>
 
 #define SQL_NAME "information.db"
 
@@ -35,7 +36,7 @@ public:
 
     bool isInfoExistsByFinger(quint16 finger_id);
 public slots:
-    void verifyFingerInfo(const QByteArray &data);
+    void updateFingerTable(const QByteArray &data);
 
 private:
     QSqlDatabase db;
