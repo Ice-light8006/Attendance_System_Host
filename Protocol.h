@@ -18,6 +18,7 @@ public:
     Protocol(QObject* parent = nullptr);
     QByteArray Builder(quint8 cmd,const QByteArray &data);
     QList<QByteArray> Parser(const QByteArray &byte);
+    void reset();
 private slots:
 private:
     QByteArray m_buffer;

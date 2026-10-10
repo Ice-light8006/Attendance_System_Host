@@ -3,10 +3,12 @@
 
 #include <QObject>
 #include <QByteArray>
+#include <QTimer>
 #include "TcpConnection.h"
 #include "TcpClient.h"
 #include "TcpServer.h"
 #include "Protocol.h"
+#include "UIDProtocol.h"
 
 #define IDLE_MODE 0xA1
 #define ENROLL_MODE 0xA2
@@ -14,6 +16,8 @@
 
 #define TOGGLE_MODE 0xB1    //通知下位机
 #define DELETE_FINGER 0xB2
+#define HOST_PING 0xB8
+#define HOST_PONG 0xAB
 
 
 
@@ -66,6 +70,8 @@
 #define DELETE_FINGER_FAILED 0xA6	//通知上位机指纹删除失败
 #define DELETE_FINGER_SUCCEED 0xA7	//通知上位机指纹删除成功
 
+#define READ_CARD_SUCCEED 0xA8  //通知上位机读卡成功数据附带卡号
+
 
 class DeviceControl:public QObject
 {
@@ -76,12 +82,31 @@ public:
     void parseEnrollCmd(quint8 cmd,const QByteArray &data);
     void parseVerifyCmd(quint8 cmd, const QByteArray &data);
     void deleteFingerByIndex(quint16 cnt);
+    void requestUIDList();
+    void requestUIDByIndex(quint8 index);
+    void insertUIDByIndex(quint8 index,const QByteArray &uid);
+    void updateUIDByIndex(quint8 index,const QByteArray &uid);
+    void deleteUIDByIndex(quint8 index);
 public slots:
     void toggleWorkMode();
 private:
     TcpClient* tcpClient;
     TcpServer* tcpServer;
     Protocol* protocol;
+    QTimer* heartbeatIntervalTimer;
+    QTimer* heartbeatTimeoutTimer;
+    quint16 heartbeatSequence = 0;
+    quint16 pendingHeartbeatSequence = 0;
+    quint8 linkState = 0;
+    quint8 missedPongs = 0;
+    bool awaitingPong = false;
+    void setLinkState(quint8 state);
+    void sendPing();
+    void onPong(const QByteArray &data);
+    void onHeartbeatTimeout();
+    void onTcpConnected();
+    void onTcpDisconnected();
+    void prepareConnection();
 private slots:
     void onConnectedReceived(QList<QByteArray> &data);
 signals:
@@ -117,13 +142,22 @@ signals:
     void verifyGenCharFailed();
     void verifySearch();
     void verifySearchFailed();
-    void verifySucceed();
+    void verifySucceed(const QByteArray &data);
     void verifyFailed();
 
     //更新UI界面上的指纹数量信号
     void updateFingerTable(const QByteArray &data);
 
     void setDisableToggleButton();
+
+    void ReadCardUID(const QByteArray &data);
+    void UIDListReceived(const QByteArray &data);
+    void UIDInfoReceived(quint8 index,const QByteArray &uid);
+    void UIDResultReceived(quint8 cmd,quint8 index,quint8 result);
+    void UIDDisconnected();
+    void deviceChecking();
+    void deviceOnline();
+    void deviceOffline();
 };
 
 #endif // DEVICECONTROL_H

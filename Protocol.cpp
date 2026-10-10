@@ -6,6 +6,11 @@ Protocol::Protocol(QObject *parent)
 
 }
 
+void Protocol::reset()
+{
+    m_buffer.clear();
+}
+
 QByteArray Protocol::Builder(quint8 cmd, const QByteArray &data)
 {
     QByteArray frame;

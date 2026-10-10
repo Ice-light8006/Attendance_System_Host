@@ -9,12 +9,14 @@ MainWindow::MainWindow(QWidget *parent)
     tcpClientPanel = new TcpClientPanel(this);
     deviceControl = new DeviceControl(this);
     controlPanel = new ControlPanel(this);
+    uidPanel = new UIDPanel(this);
     logEdit = new QPlainTextEdit(this);
     leftLayout = new QVBoxLayout;
     rightLayout = new QVBoxLayout;
     databaseManager = new DatabaseManager(this);
     databaseManager->initDatabase();
     databasePanel = new DatabasePanel(this);
+    informationDialog = new InformationDialog(databaseManager,this);
     logEdit->setReadOnly(true);
     logEdit->setContextMenuPolicy(Qt::CustomContextMenu);
     logEdit->setFixedWidth(750);
@@ -64,6 +66,27 @@ MainWindow::MainWindow(QWidget *parent)
     QObject::connect(databaseManager,&DatabaseManager::updateTableView,databasePanel,&DatabasePanel::updateTableView);
     QObject::connect(databasePanel,&DatabasePanel::deleteInfoByIndex,this,&MainWindow::deleteSelectedFinger);
     QObject::connect(deviceControl,&DeviceControl::setDisableToggleButton,controlPanel,&ControlPanel::setToggleButtonDisable);
+    QObject::connect(deviceControl,&DeviceControl::deviceChecking,controlPanel,&ControlPanel::labelToChecking);
+    QObject::connect(deviceControl,&DeviceControl::deviceOnline,controlPanel,&ControlPanel::labelToConnected);
+    QObject::connect(deviceControl,&DeviceControl::deviceOffline,controlPanel,&ControlPanel::labelToDisconnected);
+    QObject::connect(deviceControl,&DeviceControl::verifySucceed,
+                     informationDialog,&InformationDialog::showInformation);
+    QObject::connect(controlPanel,&ControlPanel::openUIDPanelRequested,this,[this](){
+        uidPanel->show();
+        uidPanel->raise();
+        uidPanel->activateWindow();
+        deviceControl->requestUIDList();
+    });
+    QObject::connect(deviceControl,&DeviceControl::UIDListReceived,uidPanel,&UIDPanel::onUIDListReceived);
+    QObject::connect(deviceControl,&DeviceControl::UIDInfoReceived,uidPanel,&UIDPanel::onUIDInfoReceived);
+    QObject::connect(deviceControl,&DeviceControl::UIDResultReceived,uidPanel,&UIDPanel::onUIDResultReceived);
+    QObject::connect(deviceControl,&DeviceControl::UIDDisconnected,uidPanel,&UIDPanel::onDisconnected);
+    QObject::connect(uidPanel,&UIDPanel::UIDListRequested,deviceControl,&DeviceControl::requestUIDList);
+    QObject::connect(uidPanel,&UIDPanel::UIDQueryRequested,deviceControl,&DeviceControl::requestUIDByIndex);
+    QObject::connect(uidPanel,&UIDPanel::UIDInsertRequested,deviceControl,&DeviceControl::insertUIDByIndex);
+    QObject::connect(uidPanel,&UIDPanel::UIDUpdateRequested,deviceControl,&DeviceControl::updateUIDByIndex);
+    QObject::connect(uidPanel,&UIDPanel::UIDDeleteRequested,deviceControl,&DeviceControl::deleteUIDByIndex);
+
 
     setupEnrollLogConnections();
     setupVerifyLogConnections();
@@ -154,6 +177,10 @@ void MainWindow::setupEnrollLogConnections()
     });
     connect(deviceControl, &DeviceControl::enrollSucceed, this, [=]() {
         appendLog("指纹录入成功！");
+    });
+    connect(deviceControl,&DeviceControl::ReadCardUID,this,[=](const QByteArray &data){
+        QString str = "识别到卡片：" + data.toHex(' ').toUpper();
+        appendLog(str);
     });
 }
 

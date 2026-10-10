@@ -6,9 +6,19 @@ DeviceControl::DeviceControl(QObject* parent)
     tcpClient = new TcpClient(this);
     tcpServer = new TcpServer(this);
     protocol = new Protocol(this);
+    heartbeatIntervalTimer = new QTimer(this);
+    heartbeatTimeoutTimer = new QTimer(this);
+    heartbeatIntervalTimer->setInterval(5000);
+    heartbeatTimeoutTimer->setSingleShot(true);
+    heartbeatTimeoutTimer->setInterval(3000);
     QObject::connect(tcpClient,&TcpClient::received,this,&DeviceControl::onConnectedReceived);
     QObject::connect(tcpServer,&TcpServer::received,this,&DeviceControl::onConnectedReceived);
+    QObject::connect(this,&DeviceControl::connectToHost,this,&DeviceControl::prepareConnection);
     QObject::connect(this,&DeviceControl::connectToHost,tcpClient,&TcpClient::connectToHost);
+    QObject::connect(tcpClient,&TcpClient::connected,this,&DeviceControl::onTcpConnected);
+    QObject::connect(tcpClient,&TcpClient::disconnected,this,&DeviceControl::onTcpDisconnected);
+    QObject::connect(heartbeatIntervalTimer,&QTimer::timeout,this,&DeviceControl::sendPing);
+    QObject::connect(heartbeatTimeoutTimer,&QTimer::timeout,this,&DeviceControl::onHeartbeatTimeout);
 }
 
 void DeviceControl::parseCmd(quint8 cmd,const QByteArray &data)
@@ -41,6 +51,43 @@ void DeviceControl::parseCmd(quint8 cmd,const QByteArray &data)
         case DELETE_FINGER_FAILED:
         {
             qDebug() << "下位机删除指纹失败";
+            break;
+        }
+        case READ_CARD_SUCCEED:
+        {
+            emit ReadCardUID(data);
+            break;
+        }
+        case UID_LIST:
+        {
+            if(data.size()==32)
+            {
+                emit UIDListReceived(data);
+            }
+            break;
+        }
+        case UID_RESULT:
+        {
+            if(data.size()<3)
+            {
+                break;
+            }
+            quint8 operation = static_cast<quint8>(data[0]);
+            quint8 index = static_cast<quint8>(data[1]);
+            quint8 result = static_cast<quint8>(data[2]);
+            if(operation==UID_QUERY && result==UID_SUCCESS && data.size()==7)
+            {
+                emit UIDInfoReceived(index,data.mid(3,4));
+            }
+            else
+            {
+                emit UIDResultReceived(operation,index,result);
+            }
+            break;
+        }
+        case HOST_PONG:
+        {
+            onPong(data);
             break;
         }
         }
@@ -226,7 +273,7 @@ void DeviceControl::parseVerifyCmd(quint8 cmd, const QByteArray &data)
 
     case VERIFY_SUCCEED:
     {
-        emit verifySucceed();
+        emit verifySucceed(data);
         break;
     }
 
@@ -251,6 +298,146 @@ void DeviceControl::deleteFingerByIndex(quint16 cnt)
     tmp[1] = static_cast<char>(cnt & 0xFF);
     QByteArray data = protocol->Builder(DELETE_FINGER,tmp);
     tcpClient->send(data);
+}
+
+void DeviceControl::requestUIDList()
+{
+    tcpClient->send(protocol->Builder(UID_REQUEST_LIST,""));
+}
+
+void DeviceControl::requestUIDByIndex(quint8 index)
+{
+    QByteArray data;
+    data.append(static_cast<char>(index));
+    tcpClient->send(protocol->Builder(UID_QUERY,data));
+}
+
+void DeviceControl::insertUIDByIndex(quint8 index,const QByteArray &uid)
+{
+    if(uid.size()!=4) return;
+    QByteArray data;
+    data.append(static_cast<char>(index));
+    data.append(uid);
+    tcpClient->send(protocol->Builder(UID_INSERT,data));
+}
+
+void DeviceControl::updateUIDByIndex(quint8 index,const QByteArray &uid)
+{
+    if(uid.size()!=4) return;
+    QByteArray data;
+    data.append(static_cast<char>(index));
+    data.append(uid);
+    tcpClient->send(protocol->Builder(UID_UPDATE,data));
+}
+
+void DeviceControl::deleteUIDByIndex(quint8 index)
+{
+    QByteArray data;
+    data.append(static_cast<char>(index));
+    tcpClient->send(protocol->Builder(UID_DELETE,data));
+}
+
+void DeviceControl::setLinkState(quint8 state)
+{
+    if(linkState==state)
+    {
+        return;
+    }
+    linkState = state;
+    if(state==0)
+    {
+        emit deviceOffline();
+    }
+    else if(state==1)
+    {
+        emit deviceChecking();
+    }
+    else
+    {
+        emit deviceOnline();
+    }
+}
+
+void DeviceControl::prepareConnection()
+{
+    heartbeatIntervalTimer->stop();
+    heartbeatTimeoutTimer->stop();
+    awaitingPong = false;
+    missedPongs = 0;
+    setLinkState(0);
+    emit UIDDisconnected();
+}
+
+void DeviceControl::onTcpConnected()
+{
+    missedPongs = 0;
+    awaitingPong = false;
+    setLinkState(1);
+    heartbeatIntervalTimer->start();
+    sendPing();
+}
+
+void DeviceControl::onTcpDisconnected()
+{
+    heartbeatIntervalTimer->stop();
+    heartbeatTimeoutTimer->stop();
+    awaitingPong = false;
+    missedPongs = 0;
+    setLinkState(0);
+    emit UIDDisconnected();
+}
+
+void DeviceControl::sendPing()
+{
+    if(!tcpClient->isConnected() || awaitingPong)
+    {
+        return;
+    }
+    pendingHeartbeatSequence = ++heartbeatSequence;
+    QByteArray data;
+    data.append(static_cast<char>(pendingHeartbeatSequence >> 8));
+    data.append(static_cast<char>(pendingHeartbeatSequence & 0xFF));
+    awaitingPong = true;
+    tcpClient->send(protocol->Builder(HOST_PING,data));
+    heartbeatTimeoutTimer->start();
+}
+
+void DeviceControl::onPong(const QByteArray &data)
+{
+    if(data.size()!=2 || !awaitingPong)
+    {
+        return;
+    }
+    quint16 sequence = (static_cast<quint8>(data[0]) << 8) |
+                       static_cast<quint8>(data[1]);
+    if(sequence!=pendingHeartbeatSequence)
+    {
+        return;
+    }
+    heartbeatTimeoutTimer->stop();
+    awaitingPong = false;
+    missedPongs = 0;
+    if(linkState!=2)
+    {
+        setLinkState(2);
+        requestUIDList();
+    }
+}
+
+void DeviceControl::onHeartbeatTimeout()
+{
+    if(!awaitingPong)
+    {
+        return;
+    }
+    awaitingPong = false;
+    missedPongs++;
+    if(missedPongs>=3)
+    {
+        heartbeatIntervalTimer->stop();
+        setLinkState(0);
+        tcpClient->disconnectFromHost();
+    }
 }
 
 

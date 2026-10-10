@@ -135,9 +135,9 @@ QVariantMap DatabaseManager::getInfoByFinger(quint16 finger_id)
         return info;
     }
 
-    info["id"] = query.value("id").toUInt();
+    info["id"] = query.value("id");
     info["name"] = query.value("name").toString();
-    info["age"] = query.value("age").toUInt();
+    info["age"] = query.value("age");
     info["sex"] = query.value("sex").toString();
     info["class"] = query.value("class").toString();
     info["email"] = query.value("email").toString();

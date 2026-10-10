@@ -28,6 +28,11 @@ qt_add_executable(Attendance_System
     DatabaseManager.cpp
     DatabasePanel.cpp
     DatabasePanel.h
+    InformationDialog.cpp
+    InformationDialog.h
+    UIDProtocol.h
+    UIDPanel.cpp
+    UIDPanel.h
 )
 
 

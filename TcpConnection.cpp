@@ -28,9 +28,19 @@ void TcpConnection::send(const QByteArray &data)
     socket->write(data);
 }
 
+bool TcpConnection::isConnected() const
+{
+    return socket->state()==QAbstractSocket::ConnectedState;
+}
+
 void TcpConnection::connectToHost(const QString &hostName, quint16 port)
 {
     this->socket->connectToHost(hostName,port);
+}
+
+void TcpConnection::disconnectFromHost()
+{
+    socket->abort();
 }
 
 void TcpConnection::receive()

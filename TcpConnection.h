@@ -14,6 +14,8 @@ public:
     TcpConnection(QObject* parent = nullptr);
     void send(const QByteArray &data);
     void connectToHost(const QString &hostName, quint16 port);
+    void disconnectFromHost();
+    bool isConnected() const;
 
 private:
     QTcpSocket* socket;

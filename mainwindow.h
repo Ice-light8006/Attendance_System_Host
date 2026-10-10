@@ -18,6 +18,8 @@
 #include "TcpClientPanel.h"
 #include "DeviceControl.h"
 #include "ControlPanel.h"
+#include "UIDPanel.h"
+#include "InformationDialog.h"
 
 class MainWindow : public QMainWindow
 {
@@ -40,6 +42,8 @@ private:
     QWidget* centralWidget;
     DeviceControl* deviceControl;
     ControlPanel* controlPanel;
+    UIDPanel* uidPanel;
+    InformationDialog* informationDialog;
     QPlainTextEdit* logEdit;
     DatabasePanel* databasePanel;
     DatabaseManager* databaseManager;
