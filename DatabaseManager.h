@@ -2,6 +2,7 @@
 #define DATABASEMANAGER_H
 
 #include <QObject>
+#include <QByteArray>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -36,11 +37,14 @@ public:
 
     bool isInfoExistsByFinger(quint16 finger_id);
 public slots:
+    // Function A: query, serialize and emit exactly one response.
+    void sendStudentInfoByFinger(quint16 finger_id);
     void updateFingerTable(const QByteArray &data);
 
 private:
     QSqlDatabase db;
 signals:
+    void studentInfoReady(const QByteArray &data);
     void updateTableView();
 };
 

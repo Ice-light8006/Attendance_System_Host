@@ -4,11 +4,13 @@
 #include <QObject>
 #include <QByteArray>
 #include <QTimer>
+#include <QString>
 #include "TcpConnection.h"
 #include "TcpClient.h"
 #include "TcpServer.h"
 #include "Protocol.h"
 #include "UIDProtocol.h"
+#include "StudentProtocol.h"
 
 #define IDLE_MODE 0xA1
 #define ENROLL_MODE 0xA2
@@ -88,6 +90,7 @@ public:
     void updateUIDByIndex(quint8 index,const QByteArray &uid);
     void deleteUIDByIndex(quint8 index);
 public slots:
+    void sendStudentInfo(const QByteArray &data);
     void toggleWorkMode();
 private:
     TcpClient* tcpClient;
@@ -110,6 +113,7 @@ private:
 private slots:
     void onConnectedReceived(QList<QByteArray> &data);
 signals:
+    void studentInfoRequested(quint16 finger_id);
     TcpConnection* connectToHost(const QString &address,quint16 port);
     void enrollMode(const QByteArray &data);
     void idleMode(const QByteArray &data);
@@ -158,6 +162,7 @@ signals:
     void deviceChecking();
     void deviceOnline();
     void deviceOffline();
+    void connectionMessage(const QString &message);
 };
 
 #endif // DEVICECONTROL_H

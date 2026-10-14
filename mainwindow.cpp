@@ -69,6 +69,9 @@ MainWindow::MainWindow(QWidget *parent)
     QObject::connect(deviceControl,&DeviceControl::deviceChecking,controlPanel,&ControlPanel::labelToChecking);
     QObject::connect(deviceControl,&DeviceControl::deviceOnline,controlPanel,&ControlPanel::labelToConnected);
     QObject::connect(deviceControl,&DeviceControl::deviceOffline,controlPanel,&ControlPanel::labelToDisconnected);
+    QObject::connect(deviceControl,&DeviceControl::connectionMessage,this,[this](const QString &message){
+        logEdit->appendPlainText(QTime::currentTime().toString("[hh:mm:ss] ") + message);
+    });
     QObject::connect(deviceControl,&DeviceControl::verifySucceed,
                      informationDialog,&InformationDialog::showInformation);
     QObject::connect(controlPanel,&ControlPanel::openUIDPanelRequested,this,[this](){
@@ -87,6 +90,11 @@ MainWindow::MainWindow(QWidget *parent)
     QObject::connect(uidPanel,&UIDPanel::UIDUpdateRequested,deviceControl,&DeviceControl::updateUIDByIndex);
     QObject::connect(uidPanel,&UIDPanel::UIDDeleteRequested,deviceControl,&DeviceControl::deleteUIDByIndex);
 
+
+    QObject::connect(deviceControl, &DeviceControl::studentInfoRequested,
+                     databaseManager, &DatabaseManager::sendStudentInfoByFinger);
+    QObject::connect(databaseManager, &DatabaseManager::studentInfoReady,
+                     deviceControl, &DeviceControl::sendStudentInfo);
 
     setupEnrollLogConnections();
     setupVerifyLogConnections();

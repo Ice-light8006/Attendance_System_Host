@@ -1,6 +1,8 @@
 #include "DatabaseManager.h"
+#include "StudentProtocol.h"
 
 DatabaseManager::DatabaseManager(QObject *parent)
+    : QObject(parent)
 {
 
 }
@@ -184,4 +186,70 @@ void DatabaseManager::updateFingerTable(const QByteArray &data)
         }
     }
     emit updateTableView();
+}
+
+void DatabaseManager::sendStudentInfoByFinger(quint16 finger_id)
+{
+    QByteArray data;
+    data.append(static_cast<char>(STUDENT_INFO_VERSION));
+    data.append(static_cast<char>(STUDENT_INFO_OK));
+    data.append(static_cast<char>(finger_id >> 8));
+    data.append(static_cast<char>(finger_id & 0xFF));
+    auto fail = [&](quint8 status) {
+        data.resize(4);
+        data[1] = static_cast<char>(status);
+        emit studentInfoReady(data);
+    };
+    if (finger_id >= STUDENT_INFO_MAX_FINGER) {
+        fail(STUDENT_INFO_INVALID);
+        return;
+    }
+    if (!db.isOpen()) {
+        fail(STUDENT_INFO_DB_ERROR);
+        return;
+    }
+    QSqlQuery query(db);
+    query.prepare("SELECT id,name,age,sex,class,email FROM information WHERE finger_id=:finger_id");
+    query.bindValue(":finger_id", finger_id);
+    if (!query.exec()) {
+        qWarning() << "Student query failed:" << query.lastError().text();
+        fail(STUDENT_INFO_DB_ERROR);
+        return;
+    }
+    if (!query.next()) {
+        fail(query.lastError().isValid() ? STUDENT_INFO_DB_ERROR : STUDENT_INFO_NOT_FOUND);
+        return;
+    }
+    bool idOk = false;
+    bool ageOk = false;
+    const qlonglong id = query.value("id").toLongLong(&idOk);
+    const QVariant ageValue = query.value("age");
+    const bool ageMissing = ageValue.isNull() || ageValue.toString().trimmed().isEmpty();
+    const int age = ageMissing ? STUDENT_INFO_AGE_UNKNOWN : ageValue.toInt(&ageOk);
+    // Existing records may have only some personal fields filled in.
+    if (!idOk || id < 0 || id > 0xFFFFFFFFLL ||
+        (!ageMissing && (!ageOk || age < 0 || age >= STUDENT_INFO_AGE_UNKNOWN))) {
+        fail(STUDENT_INFO_INVALID);
+        return;
+    }
+    const quint32 studentId = static_cast<quint32>(id);
+    for (int shift = 24; shift >= 0; shift -= 8)
+        data.append(static_cast<char>((studentId >> shift) & 0xFF));
+    data.append(static_cast<char>(age));
+    const char *fields[] = {"name", "sex", "class", "email"};
+    for (const char *field : fields) {
+        const QString value = query.value(field).toString();
+        const QByteArray text = value.trimmed().isEmpty() ? QByteArray() : value.toUtf8();
+        if (text.contains(char(0))) {
+            fail(STUDENT_INFO_INVALID);
+            return;
+        }
+        if (text.size() > 255 || data.size() + 1 + text.size() > STUDENT_INFO_MAX_PAYLOAD) {
+            fail(STUDENT_INFO_TOO_LONG);
+            return;
+        }
+        data.append(static_cast<char>(text.size()));
+        data.append(text);
+    }
+    emit studentInfoReady(data);
 }

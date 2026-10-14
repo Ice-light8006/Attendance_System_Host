@@ -23,6 +23,7 @@ private:
 private slots:
     void onConnectionReceived(const QByteArray &data);
 signals:
+    void connectionError(const QString &message);
     void received(QList<QByteArray> &data);
     void connected();
     void disconnected();

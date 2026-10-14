@@ -49,3 +49,8 @@ void TcpConnection::receive()
 
     emit received(tmp);
 }
+
+QString TcpConnection::errorString() const
+{
+    return socket->errorString();
+}

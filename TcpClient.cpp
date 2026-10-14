@@ -32,6 +32,8 @@ TcpConnection* TcpClient::connectToHost(const QString &address, quint16 port)
     //监听连接失败信号（这样填错IP你马上就能知道）
     QObject::connect(connection, &TcpConnection::errorOccurred, this, [=](QAbstractSocket::SocketError err){
         if(tcpConnection!=connection) return;
+        emit connectionError(QString("TCP 错误：code=%1，%2")
+                             .arg(static_cast<int>(err)).arg(connection->errorString()));
         qDebug() << "连接失败，错误码:" << err;
         QMessageBox::warning(nullptr, "警告", "无法连接到设备，请检查IP和端口！");
     });

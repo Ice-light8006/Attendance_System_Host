@@ -17,6 +17,7 @@ DeviceControl::DeviceControl(QObject* parent)
     QObject::connect(this,&DeviceControl::connectToHost,tcpClient,&TcpClient::connectToHost);
     QObject::connect(tcpClient,&TcpClient::connected,this,&DeviceControl::onTcpConnected);
     QObject::connect(tcpClient,&TcpClient::disconnected,this,&DeviceControl::onTcpDisconnected);
+    QObject::connect(tcpClient,&TcpClient::connectionError,this,&DeviceControl::connectionMessage);
     QObject::connect(heartbeatIntervalTimer,&QTimer::timeout,this,&DeviceControl::sendPing);
     QObject::connect(heartbeatTimeoutTimer,&QTimer::timeout,this,&DeviceControl::onHeartbeatTimeout);
 }
@@ -83,6 +84,15 @@ void DeviceControl::parseCmd(quint8 cmd,const QByteArray &data)
             {
                 emit UIDResultReceived(operation,index,result);
             }
+            break;
+        }
+        case STUDENT_INFO_REQUEST:
+        {
+            if (data.size() != 2) break;
+            const quint16 fingerId = (static_cast<quint8>(data[0]) << 8) |
+                                     static_cast<quint8>(data[1]);
+            emit connectionMessage(QString("Student request: finger=%1").arg(fingerId));
+            emit studentInfoRequested(fingerId);
             break;
         }
         case HOST_PONG:
@@ -379,6 +389,8 @@ void DeviceControl::onTcpConnected()
 
 void DeviceControl::onTcpDisconnected()
 {
+    qWarning() << "TCP 连接已断开";
+    emit connectionMessage("TCP 连接已断开");
     heartbeatIntervalTimer->stop();
     heartbeatTimeoutTimer->stop();
     awaitingPong = false;
@@ -432,8 +444,12 @@ void DeviceControl::onHeartbeatTimeout()
     }
     awaitingPong = false;
     missedPongs++;
+    qWarning() << "下位机 PONG 超时，连续次数:" << missedPongs;
+    emit connectionMessage(QString("下位机 PONG 超时（%1/3）").arg(missedPongs));
     if(missedPongs>=3)
     {
+        qWarning() << "连续三次未收到 PONG，主动断开 TCP";
+        emit connectionMessage("连续三次未收到 PONG，主动断开 TCP");
         heartbeatIntervalTimer->stop();
         setLinkState(0);
         tcpClient->disconnectFromHost();
@@ -466,4 +482,20 @@ void DeviceControl::onConnectedReceived(QList<QByteArray> &data)
         //解析好命令之后直接通过信号把命令和数据转发出去
         parseCmd(cmd,i);
     }
+}
+
+void DeviceControl::sendStudentInfo(const QByteArray &data)
+{
+    if (data.size() < 4 || data.size() > STUDENT_INFO_MAX_PAYLOAD ||
+        static_cast<quint8>(data[0]) != STUDENT_INFO_VERSION)
+        return;
+    const quint16 fingerId = (static_cast<quint8>(data[2]) << 8) |
+                             static_cast<quint8>(data[3]);
+    if (!tcpClient->isConnected()) {
+        emit connectionMessage(QString("Student response not sent: TCP disconnected, finger=%1").arg(fingerId));
+        return;
+    }
+    emit connectionMessage(QString("Student response: finger=%1 status=%2 bytes=%3")
+                           .arg(fingerId).arg(static_cast<quint8>(data[1])).arg(data.size()));
+    tcpClient->send(protocol->Builder(STUDENT_INFO_RESPONSE, data));
 }

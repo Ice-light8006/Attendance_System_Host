@@ -30,6 +30,7 @@ qt_add_executable(Attendance_System
     DatabasePanel.h
     InformationDialog.cpp
     InformationDialog.h
+    StudentProtocol.h
     UIDProtocol.h
     UIDPanel.cpp
     UIDPanel.h

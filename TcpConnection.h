@@ -16,6 +16,7 @@ public:
     void connectToHost(const QString &hostName, quint16 port);
     void disconnectFromHost();
     bool isConnected() const;
+    QString errorString() const;
 
 private:
     QTcpSocket* socket;
